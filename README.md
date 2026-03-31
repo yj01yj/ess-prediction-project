@@ -1,5 +1,4 @@
-# ESS 배터리 수명 예측 
-목적 작성 
+# ESS 배터리 수명 예측
 
 
 ## 프로젝트 개요
@@ -9,26 +8,43 @@
 - 태스크 : Regression (Cycle Life 예측)
 
 
-## 파일 구조 (sample) 
+## 현재 실행 흐름
+
+```bash
+python scripts/run_feature_engineering.py
+python scripts/run_modeling.py
 ```
-├── data/
-│   └── README.md          
+
+한 번에 실행하려면:
+
+```bash
+python scripts/run_pipeline.py
+```
+
+
+## 파일 구조
+```
+├── configs/
+│   └── config.py
 ├── notebooks/
-│   ├── 01_EDA.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   └── 03_modeling.ipynb
+│   └── ...
+├── outputs/
+│   ├── feature_cache/
+│   └── model_outputs/
+├── scripts/
+│   ├── run_feature_engineering.py
+│   ├── run_modeling.py
+│   └── run_pipeline.py
 ├── src/
-│   ├── preprocess.py
+│   ├── data_loader.py
+│   ├── feature_engineering.py
 │   ├── features.py
-│   └── train.py
-├── results/
-│   └── model_performance.csv
-├── requirements.txt
+│   └── modeling.py
 └── README.md
 ```
 
 
-## 환경 설정 (sample) 
+## 환경 설정
 ```bash
 git clone https://github.com/팀명/ess-battery-project
 cd ess-prediction-project

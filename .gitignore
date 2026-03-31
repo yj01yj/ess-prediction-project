@@ -6,3 +6,8 @@ data/*
 
 ./data/
 data/*.mat
+
+outputs/feature_cache/*
+!outputs/feature_cache/.gitkeep
+outputs/model_outputs/*
+!outputs/model_outputs/.gitkeep
