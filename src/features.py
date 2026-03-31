@@ -235,3 +235,4 @@ def load_feature_tables(input_dir, required_batches=None):
     combined_path = input_path / "features_all_batches.csv"
     combined = pd.read_csv(combined_path) if combined_path.exists() else pd.concat(feature_tables.values(), ignore_index=True)
     return feature_tables, combined
+#
