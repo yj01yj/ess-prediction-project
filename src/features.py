@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .config import DEFAULT_DATA_DIR, DEFAULT_FEATURE_CACHE_DIR, DEFAULT_FILES
-from .data import get_cell_cycles, load_batches, to_float_array
+from configs.config import DEFAULT_DATA_DIR, DEFAULT_FEATURE_CACHE_DIR, DEFAULT_FILES
+from data_loader import get_cell_cycles, load_batches, to_float_array
+
+
+EARLY_CYCLE_LIMIT = 100
 
 
 def find_knee_point(cycles, qd, min_cycle=80, window=25, acceleration_factor=2.0):
@@ -40,10 +42,22 @@ def find_knee_point(cycles, qd, min_cycle=80, window=25, acceleration_factor=2.0
     return int(cycles[knee_idx]), float(baseline), float(post)
 
 
-def build_knee_summary(frame: pd.DataFrame):
+def build_knee_summary(frame: pd.DataFrame, max_cycle=EARLY_CYCLE_LIMIT):
     rows = []
     for cell_id, sub in frame.groupby("cell_id"):
-        sub = sub.sort_values("cycle")
+        sub = sub[sub["cycle"] <= max_cycle].sort_values("cycle")
+        if sub.empty:
+            rows.append(
+                {
+                    "cell_id": cell_id,
+                    "cycle_life": np.nan,
+                    "knee_cycle": np.nan,
+                    "baseline_fade_rate": np.nan,
+                    "post_knee_fade_rate": np.nan,
+                    "fade_acceleration_ratio": np.nan,
+                }
+            )
+            continue
         knee, base, post = find_knee_point(sub["cycle"].to_numpy(), sub["QD"].to_numpy())
         rows.append(
             {
@@ -119,7 +133,7 @@ def build_delta_q_table(batch, cycle_life_df: pd.DataFrame):
     return pd.DataFrame(rows)
 
 
-def build_early_summary_features(df: pd.DataFrame, max_cycle=100):
+def build_early_summary_features(df: pd.DataFrame, max_cycle=EARLY_CYCLE_LIMIT):
     early = df[df["cycle"] <= max_cycle].copy().sort_values(["cell_id", "cycle"])
     grouped = early.groupby("cell_id")
 
@@ -156,7 +170,7 @@ def build_early_summary_features(df: pd.DataFrame, max_cycle=100):
 
 def build_feature_table_for_batch(bundle: dict, batch_name: str):
     early = build_early_summary_features(bundle["df"])
-    knee_summary = build_knee_summary(bundle["df_clean"])
+    knee_summary = build_knee_summary(bundle["df_clean"], max_cycle=EARLY_CYCLE_LIMIT)
     delta_q = build_delta_q_table(bundle["batch"], bundle["cycle_life_df"])
 
     feature_table = (
@@ -185,7 +199,7 @@ def build_feature_tables(batches: dict, verbose=True):
     for batch_name, bundle in batches.items():
         if verbose:
             print(f"[features] {batch_name}: building feature table", flush=True)
-        bundle["knee_summary"] = build_knee_summary(bundle["df_clean"])
+        bundle["knee_summary"] = build_knee_summary(bundle["df_clean"], max_cycle=EARLY_CYCLE_LIMIT)
         bundle["delta_q"] = build_delta_q_table(bundle["batch"], bundle["cycle_life_df"])
         tables[batch_name] = build_feature_table_for_batch(bundle, batch_name)
         if verbose:
@@ -239,29 +253,18 @@ def load_feature_tables(input_dir, required_batches=None):
     return feature_tables, combined
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Build and cache Day 2 feature tables from raw batch .mat files.")
-    parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Directory containing .mat batch files")
-    parser.add_argument(
-        "--feature-cache-dir",
-        default=str(DEFAULT_FEATURE_CACHE_DIR),
-        help="Directory to store cached feature tables",
-    )
-    return parser.parse_args()
-
-
-def main():
-    args = parse_args()
-    feature_cache_dir = Path(args.feature_cache_dir)
+def build_and_save_feature_cache(data_dir=DEFAULT_DATA_DIR, feature_cache_dir=DEFAULT_FEATURE_CACHE_DIR):
+    feature_cache_dir = Path(feature_cache_dir)
     feature_cache_dir.mkdir(parents=True, exist_ok=True)
 
-    batches = load_batches(args.data_dir, DEFAULT_FILES)
+    batches = load_batches(data_dir, DEFAULT_FILES)
     feature_tables, combined = build_feature_tables(batches)
     save_feature_tables(feature_tables, feature_cache_dir)
 
     print(f"[features] saved cache to {feature_cache_dir}")
     print(f"[features] combined shape={combined.shape}")
+    return feature_tables, combined
 
 
-if __name__ == "__main__":
-    main()
+def main():
+    build_and_save_feature_cache()
