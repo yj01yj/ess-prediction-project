@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .data_loader import get_cell_cycles, to_float_array
+from .config import DEFAULT_DATA_DIR, DEFAULT_FEATURE_CACHE_DIR, DEFAULT_FILES
+from .data import get_cell_cycles, load_batches, to_float_array
 
 
 def find_knee_point(cycles, qd, min_cycle=80, window=25, acceleration_factor=2.0):
@@ -235,3 +237,31 @@ def load_feature_tables(input_dir, required_batches=None):
     combined_path = input_path / "features_all_batches.csv"
     combined = pd.read_csv(combined_path) if combined_path.exists() else pd.concat(feature_tables.values(), ignore_index=True)
     return feature_tables, combined
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Build and cache Day 2 feature tables from raw batch .mat files.")
+    parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Directory containing .mat batch files")
+    parser.add_argument(
+        "--feature-cache-dir",
+        default=str(DEFAULT_FEATURE_CACHE_DIR),
+        help="Directory to store cached feature tables",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    feature_cache_dir = Path(args.feature_cache_dir)
+    feature_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    batches = load_batches(args.data_dir, DEFAULT_FILES)
+    feature_tables, combined = build_feature_tables(batches)
+    save_feature_tables(feature_tables, feature_cache_dir)
+
+    print(f"[features] saved cache to {feature_cache_dir}")
+    print(f"[features] combined shape={combined.shape}")
+
+
+if __name__ == "__main__":
+    main()
